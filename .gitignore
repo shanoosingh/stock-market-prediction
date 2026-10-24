@@ -1,0 +1,64 @@
+# Python environments
+.venv/
+.venv-*/
+venv/
+env/
+ENV/
+
+# Python and test caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local environment files and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+.streamlit/secrets.toml
+secrets.toml
+secrets.*
+!secrets.example.*
+credentials.*
+!credentials.example.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local databases and SQLite sidecars
+data/market_data.sqlite3
+data/market_data.sqlite3-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.db
+*.db-*
+
+# Generated local market data
+data/*
+!data/.gitkeep
+
+# Model artifacts
+*.joblib
+*.pkl
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+*.bak
+*.backup
+tmp/
+temp/

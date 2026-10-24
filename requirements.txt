@@ -1,0 +1,9 @@
+# Python 3.11 or 3.12
+numpy>=1.26,<3
+pandas>=2.1,<4
+yfinance>=0.2.40,<2
+openchart==0.2.0
+plotly>=5.20,<8
+streamlit>=1.32,<2
+scikit-learn>=1.4,<2
+pytest>=8,<9
