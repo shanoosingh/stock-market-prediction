@@ -1,26 +1,43 @@
-﻿# Stock Market Data Analysis and Trend Prediction
+﻿# Indian Stock Market Analysis & Experimental Backtesting
 
-An educational Python application for inspecting daily historical stock data, calculating common technical indicators, and comparing experimental next-session price models. Yahoo Finance data is historical and may be delayed or revised. Nothing in this project is investment advice.
+An educational Streamlit application for exploring Indian equity history, technical indicators, investment-risk measures, and simple backtests. Yahoo Finance data may be delayed or revised. This project is not investment advice.
 
-## Objectives and features
+> **Research status:** The machine-learning experiments have not shown reliable improvement over simple baselines. Forecasts and backtests are experimental historical analysis—not trading signals or promises of returns.
 
-- Retrieve historical NSE data through OpenChart when available, with Yahoo Finance as a separate fallback; Yahoo Finance remains available for US tickers.
-- Review date coverage, closing prices, returns, volume, and price trends interactively.
-- Calculate trailing moving averages, Wilder RSI, MACD, daily returns, and annualized rolling volatility.
-- Compare naive persistence, Linear Regression, and Random Forest on a chronological holdout.
-- Produce optional recursive 1, 5, or 10 trading-session experimental forecasts.
+## Project overview
+
+- Explore historical data for the saved NIFTY 50 roster or another NSE ticker ending in `.NS`.
+- Review price trends, returns, volume, moving averages, RSI, MACD, volatility, and drawdown.
+- Compare a stock with an optional benchmark over matching dates.
+- Run an opt-in daily backtest for buy-and-hold, no-trade, or a fixed SMA crossover, with illustrative transaction costs.
+- Inspect chronological Linear Regression and Random Forest experiments and optional recursive forecasts. These models have not been validated as predictors.
+
+Yahoo Finance is the default provider. Its data may be delayed, revised, unavailable, or rate-limited. The dashboard identifies stale cached data instead of presenting it as a confirmed current quote. It does not place trades or connect to a brokerage account.
+
+## Contents
+
+- [Run the dashboard](#install-and-run-windows-powershell)
+- [College demonstration](#college-demonstration)
+- [Data-source behavior](#usage)
+- [Indicators and risk analysis](#indicators)
+- [Backtesting and cost assumptions](#experimental-backtesting-engine)
+- [Machine-learning method and limitations](#machine-learning-method)
+- [Safe offline tests](#tests)
+- [Troubleshooting](#troubleshooting)
 
 ## Technologies and architecture
 
-Python 3.11 or 3.12, Pandas, NumPy, OpenChart, yfinance, Plotly, Streamlit, scikit-learn, and pytest. The dashboard calls reusable modules: provider service → data collection → preprocessing → indicators/EDA → modeling → recursive forecasting. Models are fitted at runtime and are not saved.
+Python 3.11 or 3.12, Pandas, NumPy, Requests, OpenChart, yfinance, Plotly, Streamlit, scikit-learn, and pytest. The dashboard calls reusable modules: provider service → data collection → preprocessing → indicators/EDA → modeling → recursive forecasting. Models are fitted at runtime and are not saved.
 
 ## Project structure
 
 ```text
 app.py                     Streamlit user interface
 data_collection.py         Yahoo Finance daily and short intraday downloads
-market_data_service.py     OpenChart-first NSE retrieval, Yahoo fallback, cooldown, last-good retention
+market_data_service.py     OpenChart-first auto route, isolated explicit provider routes, cooldown and last-good retention
 market_data_storage.py    Provider-separated SQLite candle persistence
+tejhq_provider.py          Explicit keyless NSE daily adapter
+smartapi_provider.py       Explicit daily adapter; live HTTP disabled pending header-contract confirmation
 preprocessing.py           Validation and cleanup
 exploratory_analysis.py    Summary statistics and Plotly charts
 technical_indicators.py   Causal indicator calculations
@@ -40,15 +57,16 @@ From the project directory:
 cd X:\stock-market-predicton
 ```
 
-Use the existing `.venv` if it is healthy. Check its Python version; the project targets Python 3.11 or 3.12.
+Use the existing `.venv` if it is healthy. The project targets Python 3.11 or 3.12. Check the environment before the demonstration; do not reinstall requirements just to launch an already prepared environment.
 
 ```powershell
 .\.venv\Scripts\python.exe --version
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m streamlit --version
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-If `.venv` was created with an unsupported Python version, use an installed 3.11/3.12 launcher to make a new environment in another project-local folder, preserving the existing environment:
+Only for a new environment, use an installed 3.11/3.12 launcher and install the declared dependencies. Preserve an existing environment when creating a replacement:
 
 ```powershell
 py -3.12 -m venv .venv312
@@ -58,21 +76,57 @@ py -3.12 -m venv .venv312
 
 Open the local URL printed by Streamlit (normally `http://localhost:8501`). Press Ctrl+C in the same terminal to stop it. Internet access is needed for either market-data provider. If a managed Windows environment denies Streamlit's default configuration path, use the project-local temporary configuration workaround you already have.
 
+### College demonstration
+
+The dashboard defaults to Yahoo Finance only. When an archived NIFTY 50 dataset is found under the user's TEMP folder, **Local NIFTY 50 CSV archive** is available as a read-only option that does not call a provider or write SQLite. **Automatic provider fallback** can be selected to try OpenChart before Yahoo Finance. Provider modes use network access and the normal SQLite persistence path. Automatic display refresh is off by default; when enabled, the display reruns every five seconds while provider cooldowns still apply. Before presenting, check the selected stock's date range and data-source label. Provider data availability and timing are not guaranteed; OpenChart historical data has known availability issues, and Yahoo Finance may be delayed. The local archive is a fixed historical snapshot, not current live data.
+
+A five-minute walkthrough: (1) select an Indian company from the NIFTY 50 list, choose a daily interval, and confirm that a result loaded; (2) point out the latest observed price/date, adjusted-close choice, provider label, and freshness warnings; (3) show the price chart and existing moving averages, RSI, MACD, returns, and rolling volatility as descriptive historical measures; (4) explain recent return, volatility, drawdown, and optional exact-date benchmark comparison; (5) open **Experimental daily backtest**, choose a strategy and medium delivery-cost preset, choose a date range, and click the run button. Show gross/net returns, costs, freshness, session-coverage warnings, and benchmark provenance if supplied. Explain that the benchmark label is not verified and gaps are not holiday-classified. Do not rank strategies or present results as forecasts or evidence of profitability.
+
+If provider data is unavailable, `offline_backtest_preview.py` demonstrates the report and comparison helpers with deterministic synthetic prices. Run `.\.venv\Scripts\python.exe offline_backtest_preview.py` in a separate terminal and identify it as synthetic; it does not demonstrate the dashboard charts or technical-indicator screens.
+
 ## Usage
 
-Pick a US or Indian market example, or type another ticker. NSE `.NS` symbols are mapped to exact NSE equity symbols (for example, `RELIANCE.NS` → `RELIANCE-EQ`) and accepted only when OpenChart returns one exact NSE equity match. Examples include `AAPL`, `MSFT`, `GOOGL`, `RELIANCE.NS`, `TCS.NS`, and `INFY.NS`. Choose a preset period or an explicit custom date range (end is exclusive), then inspect the history, indicators, test metrics, and optional forecast. Automatic display checks default to every 5 seconds. Each provider is requested at most once per ticker and interval every 30 seconds; manual refresh does not bypass that cooldown.
+The dashboard is India-only. Choose one of the 50 NIFTY 50 constituents in the archived official NSE roster snapshot, or enter another NSE ticker ending in `.NS`. The bundled `nifty50_constituents_source.csv` and `.json` provenance record were retrieved from NSE on 2026-10-24; this is a fixed snapshot and is not automatically updated when index membership changes. Each selector entry shows the company name and NSE symbol. **Yahoo Finance** is the default provider and selects Yahoo only; it does not try OpenChart first. **Automatic provider fallback** explicitly tries OpenChart before Yahoo. When a local dataset is present, **Local NIFTY 50 CSV archive** reads each ticker's own CSV without providers or database writes. `NIFTY50_DATASET_DIR` can point to a particular run directory or the parent folder containing `run_*` directories. The local archive is daily only and does not fall back to providers for missing tickers. For provider mode, symbols are mapped to exact NSE equity symbols (for example, `RELIANCE.NS` → `RELIANCE-EQ`) and accepted by OpenChart only when it returns one exact NSE equity match. Choose a preset period or an explicit custom date range (end is exclusive), then inspect the history, indicators, test metrics, and optional forecast. Automatic display refresh is off by default. If enabled, the page reruns every 5 seconds, but each provider is requested at most once per ticker and interval every 30 seconds; manual refresh does not bypass that cooldown.
 
 ### Historical Indian intraday bars
 
-The dashboard offers historical `5m` and `15m` intervals. For NSE `.NS` equities, OpenChart is tried first when installed and usable; Yahoo Finance is tried as a separate fallback. US tickers use Yahoo Finance. Availability varies by symbol and interval. Intraday timestamps are normalized to `Asia/Kolkata` for NSE symbols; OpenChart's naive timestamps are interpreted as Indian market time, not UTC. Yahoo's existing intraday range restrictions still apply on its fallback path.
+The dashboard offers historical `5m` and `15m` intervals for NSE `.NS` equities in provider modes. Yahoo-only mode is the default and requests Yahoo directly; select automatic fallback to try OpenChart first and Yahoo second. Availability varies by symbol and interval. Intraday timestamps are normalized to `Asia/Kolkata` for NSE symbols. OpenChart 0.2.0 parses epoch-millisecond timestamps as UTC and then drops timezone metadata; the adapter restores UTC before converting those timestamps to IST. Yahoo's existing intraday range restrictions apply. OpenChart historical availability remains unresolved: a controlled `RELIANCE.NS` daily request returned HTTP 200 with `status=true` and an empty candle list, so automatic mode may fall back to Yahoo or report no data.
 
-The dashboard shows the actual provider, local retrieval time, latest candle timestamp, and approximate candle age when available. A five-second display check does not mean a provider is queried that often, nor does it make the data live. The 30-second provider cooldown is separate from display refresh, and failed checks retain the last successful dataset with a warning. Candle completion and freshness are unverified. OpenChart is an unofficial client for NSE's charting endpoint and is not affiliated with or endorsed by NSE. Yahoo Finance is accessed through the community `yfinance` package and is not affiliated with Yahoo. Provider availability, rate limits, historical coverage, and data-use terms can change; do not redistribute downloaded data. The daily indicators, model evaluation, and forecasts remain available only in daily mode; intraday forecasting has not been enabled.
+The dashboard shows the provider reported for the displayed dataset, its retrieval time, and the latest observation. For daily bars it shows the calendar date only; a timezone-naive midnight is not presented as the market-close time, and missing timezone information remains explicit. Intraday timestamps and approximate age are shown when available. When providers fail or are cooling down, the service may return its last successful in-memory snapshot marked stale; the displayed retrieval time remains that snapshot's original successful retrieval, not the failed refresh time. The dashboard prominently labels stale snapshots and does not describe them as current or live. Automatic refresh is off by default; if enabled, its five-second page reruns do not bypass the 30-second provider cooldown or guarantee new data. Candle completion and freshness are unverified. OpenChart is an unofficial client for NSE's charting endpoint and is not affiliated with or endorsed by NSE. Yahoo Finance is accessed through the community `yfinance` package and is not affiliated with Yahoo. Provider availability, rate limits, historical coverage, and data-use terms can change; do not redistribute downloaded data. The daily indicators, model evaluation, and forecasts remain available only in daily mode; intraday forecasting has not been enabled.
+
+### Explicit TejHQ daily provider
+
+`MarketDataService.fetch(..., provider="yahoo")` selects Yahoo Finance only and does not call OpenChart. The dashboard uses this explicit Yahoo-only mode by default. `provider="auto"` remains the separate OpenChart-first, Yahoo-fallback mode. TejHQ and SmartAPI remain separate explicit modes and are not added to automatic fallback. Pass `persist=False` for a diagnostic fetch that must skip the service's SQLite writes; the dashboard's provider mode retains normal persistence.
+
+`MarketDataService.fetch(..., provider="tejhq")` selects TejHQ only; it does not fall back to OpenChart or Yahoo Finance. This adapter supports NSE `.NS` symbols and daily (`1d`) candles only. It uses the provider-published keyless `GET /v1/ohlcv/{exchange}/{symbol}` interface with inclusive `from` and `to` ISO dates, a 10-second request timeout, no automatic retries, and no redirect following. The normal `provider="auto"` route remains unchanged and does not include TejHQ.
+
+The provider describes the public endpoint as free, keyless EOD data, sourced from exchange bhavcopy, with an advertised NSE history beginning 2010-01-04. Its published documentation states that refreshes run on trading days after market close and describes rate limits of 100 requests per 10 seconds per IP at the edge and 120 per minute at origin. These are provider statements, not independently verified guarantees; availability, coverage, rate limits, licensing, and freshness can change. The regular OHLCV route supplies unadjusted close; this adapter never renames `Close` to `Adj Close`. It preserves an `adj_close` field only if a response actually supplies it. Empty or malformed responses and invalid candles are errors. Unsorted valid rows are sorted with a warning; duplicates are rejected. One controlled live validation succeeded for `RELIANCE.NS` with 62 daily candles from 2026-07-27 through 2026-10-23 using `persist=False` and no provider fallback or database write. That single symbol/range does not establish general coverage or reliability.
+
+### Angel One SmartAPI status
+
+`MarketDataService.fetch(..., provider="smartapi")` explicitly selects Angel One SmartAPI and suppresses OpenChart, TejHQ, and Yahoo fallback. It supports NSE `.NS` daily candles only; `provider="auto"` remains unchanged and does not include SmartAPI. The provider reads configuration only when called and does not require credentials at import time. **Live HTTP is disabled in `smartapi_provider.py`** until Angel One confirms the endpoint-specific authentication-header contract. Mocked tests temporarily enable the adapter with fake sessions; no live SmartAPI request has been made.
+
+The adapter uses the official `loginByPassword` flow (client code, PIN, current six-digit TOTP) and `POST /rest/secure/angelbroking/historical/v1/getCandleData`. The endpoint-specific [SmartAPI guide](https://smartapi.angelone.in/docs/MarketData) shows login with `Content-Type`, `Accept`, `X-UserType`, `X-SourceID`, local/public IP, MAC, and `X-PrivateKey`; the official [Python SDK](https://github.com/angel-one/smartapi-python/blob/main/SmartApi/smartConnect.py) constructs the same common header set and adds `Authorization: Bearer <JWT>` after login for authenticated requests. Its historical/logout methods use the shared request builder, which does not add `x-api-key`, `x-client-code`, or `x-feed-token`. The endpoint guide's historical and logout examples likewise show the common headers plus bearer JWT.
+
+There is still a material conflict: the general [SmartAPI User guide](https://smartapi.angelone.in/docs/User) separately marks `Authorization`, `x-api-key`, `x-client-code`, and `x-feed-token` mandatory in its authentication-header table. The endpoint examples and SDK conflict with that table about the three additional headers, and the SDK is implementation evidence rather than a guarantee of the current server contract. The adapter retains its pre-existing combined headers on secured requests and remains **live-disabled** pending explicit Angel One confirmation. Do not infer that sending the union is correct. Offline tests verify the documented common headers and JWT stage transition only; they do not validate the disputed server contract.
+
+| Stage | Method and endpoint | Endpoint-specific documented headers | Authentication value available then | Evidence / status |
+|---|---|---|---|---|
+| Login | `POST /rest/auth/angelbroking/user/v1/loginByPassword` | JSON content/accept, `X-PrivateKey`, `X-UserType`, `X-SourceID`, client local/public IP, MAC | No session token yet; client code, PIN, and current TOTP are in the JSON body | Login examples in the endpoint guide and SDK common-header builder agree. |
+| Historical candles | `POST /rest/secure/angelbroking/historical/v1/getCandleData` | Same common headers plus `Authorization: Bearer <JWT>` in endpoint examples and SDK behavior | JWT from successful login; feed token is also returned but examples/SDK do not use it for this call | General auth table additionally requires `x-api-key`, `x-client-code`, `x-feed-token`; unresolved conflict prevents live validation. |
+| Logout | `POST /rest/secure/angelbroking/user/v1/logout` | Same common headers plus bearer JWT in endpoint example and SDK shared request construction | JWT from successful login; client code in JSON body | General auth table's additional-header requirement conflicts with examples/SDK; exact server contract unconfirmed. |
+
+HTTP methods and paths are documented in the [SmartAPI User guide](https://smartapi.angelone.in/docs/User); candle request details are in the [Historical API guide](https://smartapi.angelone.in/docs/MarketData). The table distinguishes endpoint examples from the generic authentication table; it does not claim independent authentication of the SDK or guarantee server behavior.
+
+The daily request uses exchange `NSE`, an exact `symboltoken` resolved from Angel One's published instrument master (`symbol` such as `RELIANCE-EQ`, `name`, `token`, `exch_seg=nse_cm`), interval `ONE_DAY`, and Asia/Kolkata date bounds formatted `yyyy-MM-dd hh:mm`. The documented maximum is 2,000 days per request. The documented candle schema is timestamp plus OHLCV; this adapter never fabricates `Adj Close`, so only unadjusted `Close` is available. It rejects malformed, duplicate-date, non-finite, non-positive, and invalid-OHLC records. Each HTTP request uses a 10-second timeout, disables redirects, and does not retry. HTTP 401 is categorized as authentication rejection, HTTP 429 as rate limiting, and HTTP 403 as an ambiguous forbidden response because SmartAPI documents 403 for rate-limit denial as well as access rejection. The documented historical endpoint limit is 3 requests/second, 180/minute, and 5,000/hour per client code ([official rate-limit table](https://smartapi.angelone.in/docs/RateLimit)); actual account/provider throttling may be stricter. The service does not currently enforce a shared account-wide limit across symbols; do not use it for batch requests. Official documentation inspected here does not establish costs or market-data redistribution/licensing terms; confirm applicable SmartAPI/account terms before use. Instrument master is documented as refreshed daily; this adapter downloads it per call and does not persist/cache it.
+
+Set these environment variables before an explicit SmartAPI call; never put their values in source files or logs: `ANGELONE_SMARTAPI_KEY`, `ANGELONE_CLIENT_CODE`, `ANGELONE_PIN`, `ANGELONE_TOTP` (the current six-digit code, not the long-lived authenticator secret), `ANGELONE_CLIENT_LOCAL_IP`, `ANGELONE_CLIENT_PUBLIC_IP`, and `ANGELONE_CLIENT_MAC_ADDRESS`. Missing values fail before HTTP calls. After valid login tokens are received, the adapter attempts the documented logout POST with the client code in its body and authenticated headers on both success and failure. It does not log or retain tokens beyond the call. A logout failure after a successful candle fetch is returned as a warning; during an existing fetch failure it does not replace the original error. The logout route is documented, but its exact required header combination remains subject to the ambiguity above. `persist=False` skips the service's candle-storage path, but the adapter still makes the required login, instrument-master, historical, and logout HTTP requests. Use `provider="smartapi", persist=False` for a provider-only non-persisting request. The shared service may return an explicitly stale prior snapshot from the same selected provider during cooldown or after failure; it cannot substitute another provider for this explicit selection. The documented limits are per client code; the project does not implement account-wide rate limiting, so do not use this provider for batch requests until that safeguard is designed. No exchange calendar is implemented, and mocked offline tests do not establish live account eligibility, historical availability, or general provider reliability.
 
 ## Local candle storage
 
 Successful provider downloads are stored in `data/market_data.sqlite3`, created automatically the first time a valid dataset is saved. This uses Python's built-in SQLite library and adds no package dependency. The database is local and excluded from version control by the existing `data/*` ignore rule. Back it up by stopping the dashboard and copying `data/market_data.sqlite3` to a separate safe location; never place the only backup inside the project folder. SQLite journals may exist briefly while the application is writing, so copy after stopping the app for a consistent simple file backup.
 
-Stored keys include ticker, interval, UTC timestamp, and exact provider/source. OpenChart and Yahoo Finance candles remain separate. Saving a repeated candle updates that source's prior row deterministically (last write wins). The service persists the successful response but does not merge stored rows into the dashboard result or substitute stored rows after failure. The existing in-memory cooldown and last-successful snapshot remain distinct: a stored candle has no new retrieval time, and loading stored history does not label it as freshly fetched. The storage module offers source-specific range and full-history queries for later offline analysis.
+Stored keys include ticker, interval, UTC timestamp, and exact provider/source. OpenChart and Yahoo Finance candles remain separate. Saving a repeated candle updates that source's prior row deterministically (last write wins). `MarketDataService.fetch()` persists successful results by default. Diagnostic callers can explicitly pass `persist=False` to skip `save_candles()` and this service's SQLite writes. Provider-only diagnostic requests can explicitly select `provider="yahoo"`, `provider="openchart"`, `provider="tejhq"`, or `provider="smartapi"` together with `persist=False`; OpenChart, TejHQ, and SmartAPI require NSE `.NS` symbols, and none of these modes silently falls back to another provider. The SmartAPI adapter does not invoke yfinance or use a SQLite-backed cache. The dashboard defaults to explicit Yahoo-only mode; automatic OpenChart-first/Yahoo-fallback mode remains an opt-in choice. The service does not merge stored rows into the dashboard result or substitute stored rows after failure. The existing in-memory cooldown and last-successful snapshot remain distinct: a stored candle has no new retrieval time, and loading stored history does not label it as freshly fetched. The storage module offers source-specific range and full-history queries for later offline analysis.
 
 Database timestamps are stored as UTC instants with a timezone label for reconstruction. Naive NSE (`.NS`/`.BO`) timestamps are interpreted as `Asia/Kolkata`; other naive timestamps default to UTC. Timezone-aware input is converted as an instant and read back in the stored market timezone. The store rejects datasets with missing or invalid OHLCV data or impossible OHLC relationships; it does not fabricate prices or missing candles. If saving fails, the dashboard can still show the provider response and reports a storage warning.
 
@@ -101,7 +155,7 @@ Data freshness separates retrieval time from observation date. A cached response
 
 ### Market-data quality and freshness safeguards
 
-Provider timestamps that cannot be parsed are excluded with a quality warning; duplicate timestamps and out-of-order input are reported before preprocessing sorts the data and retains the last duplicate. Missing numeric values remain gaps. Quality checks report missing OHLCV columns/values, nonnumeric or non-finite values, nonpositive OHLC/adjusted prices, negative volume, and impossible High/Low relationships. The dashboard now stops selected-price summaries when supplied values are nonnumeric, non-finite, zero, or negative. Other field inconsistencies remain visible as quality warnings, and the SQLite storage layer rejects quality-flagged rows if persistence is attempted.
+Provider timestamps that cannot be parsed are excluded with a quality warning; duplicate timestamps and out-of-order input are reported before preprocessing sorts the data and retains the last duplicate. Missing numeric values remain gaps. Quality checks report missing OHLCV columns/values, nonnumeric or non-finite values, nonpositive OHLC/adjusted prices, negative volume, and impossible High/Low relationships. The dashboard stops selected-price summaries when supplied values are nonnumeric, non-finite, zero, or negative, and stops summaries if valid prices produce non-finite returns. Invalid latest raw closes are shown as unavailable; incomplete or invalid volume aggregates are unavailable and invalid volume bars are omitted. Other field inconsistencies remain visible as quality warnings, and the SQLite storage layer rejects quality-flagged rows if persistence is attempted.
 
 Freshness uses the latest valid selected-price observation, converts its timestamp to Asia/Kolkata for the reported observation date and age, and separately normalizes retrieval metadata to that timezone. Provider fallback/cooldown snapshots are marked stale; old retrieval metadata, old observations, future observations, and future retrieval timestamps are warned about. The observation-age threshold is calendar days, so weekends and holidays can contribute to it.
 
@@ -115,13 +169,17 @@ The model panel identifies the selected price basis, training period, chronologi
 
 `build_backtest_report(result, periods=...)` provides presentation-ready fields for cost mode/preset, gross and net cumulative return, benchmark dates and provenance status, chronological segment descriptions, and limitations. Benchmark and strategy inputs must have exactly matching normalized daily dates; absent observations or NaN prices are rejected, with no filling or interpolation. A caller-supplied `benchmark_source` or series name is only a label: reports mark it `caller_asserted`, set `source_independently_verified=False`, and retain a fingerprint that identifies the supplied aligned values but does not authenticate them. Unlabeled data is marked `unknown`. No current API independently verifies benchmark origin. For a Series, `price_column` is the assumed price basis; a recognized conflicting Series name or an explicit conflicting `benchmark_price_basis` is rejected. DataFrame inputs select the requested price column. `run_chronological_evaluation()` returns development, validation, and final-evaluation summaries with gross and net returns. Prior-examined periods are retrospective; the final segment is an untouched holdout only if nobody previously examined its dates or outcomes.
 
+The daily results frame uses the selected price-basis name (`Adj Close` or `Close`). Metric summarization rejects missing/non-finite returns, invalid costs/turnover, duplicate dates, and non-chronological rows. CAGR is unavailable for zero-duration periods or when annualizing would overflow numeric range; it is not emitted as infinity. Annualized volatility is unavailable for one observation or if the result cannot be represented finitely.
+
 ### Dashboard backtest panel
 
 The **Experimental daily backtest** panel appears for NSE `.NS` tickers on the daily (`1d`) workflow. It reuses the data result already loaded by the dashboard and runs calculations only after **Run selected backtest** is clicked. The form-submit rerun reuses the matching session-local data result; it does not call the market-data service again. Normal dashboard refresh/periodic data behavior is unchanged. This panel supports buy-and-hold, no-trade, and the fixed 20/50-session SMA crossover; it does not expose parameter tuning or strategy ranking. The user chooses an inclusive evaluation date range, `Adj Close`/`Close`, an illustrative low/medium/high NSE delivery-cost preset, or a separate `ZERO COST / FRICTIONLESS` mode.
 
+Backtest reports include a conservative session-coverage screen. It excludes weekend dates from the weekday-gap count and lists absent Monday-Friday dates as **unclassified weekday gaps**; it does not label them missing NSE sessions because no verified local NSE holiday calendar is available. Weekend dates are listed separately, including any observed weekend dates, because special sessions are not modeled. Coverage checks do not fill prices or add candles, and even a range with no weekday gaps is not certified complete. Freshness age remains a separate calendar-time policy and is not adjusted for trading sessions.
+
 The existing optional benchmark CSV upload can be included in the backtest. Its filename is a caller-provided label, not verified provenance. The selected price basis and every normalized daily observation date in the evaluation slice must match exactly; missing/extra dates and invalid values stop the benchmark comparison. Benchmark freshness and authenticity are not independently verified. The backtest report shows evaluation dates, price basis, reported provider label, latest observation/retrieval/evaluation timestamps, freshness status, gross/net return, available CAGR/drawdown/volatility, turnover, orders, costs, benchmark provenance status, and limitations. The report is historical analysis, not a forecast, recommendation, or profitability claim.
 
-Daily inputs use the validated backtest policy: unknown source/timestamps, future timestamps, invalid prices, and intraday data are not overrideable. Data older than the daily freshness limits or marked stale is rejected unless **Allow stale data for diagnostic/historical analysis** is explicitly checked; the report then shows `stale_override` and its warnings. This permits retrospective slices without calling them fresh. A stale override does not authenticate provider or benchmark provenance. The engine has no exchange calendar, so dates missing from both supplied series cannot be classified as holidays or omitted sessions; its execution assumption is based on observed rows.
+Daily inputs use the validated backtest policy: unknown source/timestamps, future timestamps, invalid prices, and intraday data are not overrideable. Data older than the daily freshness limits or marked stale is rejected unless **Allow stale data for diagnostic/historical analysis** is explicitly checked; the report then shows `stale_override` and its warnings. This permits retrospective slices without calling them fresh. A stale override does not authenticate provider or benchmark provenance. The weekday screen cannot classify a gap as an NSE holiday or omitted session, including dates missing from both supplied series; execution assumptions remain based on observed rows.
 
 To preview the report without using the dashboard, run:
 
@@ -189,19 +247,14 @@ Future predictions are recursive: model predictions are fed into later lag and i
 
 ## Tests
 
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe -m compileall -q app.py data_collection.py preprocessing.py exploratory_analysis.py investment_analysis.py technical_indicators.py model_training.py forecasting.py backtesting.py offline_backtest_preview.py tests
-```
-
-Tests use synthetic local data, mocked provider responses, and isolated temporary SQLite databases; they do not require a network connection or write mocked candles to the project's default database. `tests/test_dashboard_offline.py` runs the Streamlit app with a fake data service and explicitly fails if production fetching or SQLite persistence is attempted.
-
-For a focused audit run that excludes the service test which writes a temporary SQLite database:
+The safe offline suite below uses synthetic data and mocked providers. `tests/conftest.py` blocks non-loopback sockets suite-wide; dashboard AppTest may use loopback internally. It excludes the SQLite-storage suite and the service persistence test. It does not access the project database or `data/`.
 
 ```powershell
 $env:PYTHONDONTWRITEBYTECODE='1'
-.\.venv\Scripts\python.exe -B -m pytest -p no:cacheprovider -q tests\test_backtesting.py tests\test_backtesting_freshness.py tests\test_offline_backtest_preview.py tests\test_data_quality.py tests\test_exploratory_analysis.py tests\test_investment_analysis.py tests\test_preprocessing.py tests\test_market_data_service.py tests\test_dashboard_offline.py -k 'not successful_fetch_persists_only_the_selected_provider_source'
+.\.venv\Scripts\python.exe -B -m pytest -p no:cacheprovider -q tests\test_backtesting.py tests\test_backtesting_freshness.py tests\test_data_collection.py tests\test_data_quality.py tests\test_dashboard_offline.py tests\test_exploratory_analysis.py tests\test_forecasting.py tests\test_investment_analysis.py tests\test_market_data_service.py tests\test_model_training.py tests\test_nifty50_downloader.py tests\test_nse_trading_calendar.py tests\test_offline_backtest_preview.py tests\test_preprocessing.py tests\test_smartapi_provider.py tests\test_technical_indicators.py tests\test_tejhq_provider.py -k 'not successful_fetch_persists_only_the_selected_provider_source'
 ```
+
+This omits `tests/test_market_data_storage.py` because those tests create temporary SQLite databases, and deselects `successful_fetch_persists_only_the_selected_provider_source` for the same persistence-related reason. The standard `pytest -q` command includes those tests and is not the safe no-database command above.
 
 ## Troubleshooting
 
